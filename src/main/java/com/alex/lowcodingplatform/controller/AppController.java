@@ -2,6 +2,7 @@ package com.alex.lowcodingplatform.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import com.alex.lowcodingplatform.annotation.AuthCheck;
 import com.alex.lowcodingplatform.common.BaseResponse;
@@ -12,10 +13,7 @@ import com.alex.lowcodingplatform.constant.UserConstant;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
-import com.alex.lowcodingplatform.model.dto.app.AppAddRequest;
-import com.alex.lowcodingplatform.model.dto.app.AppAdminUpdateRequest;
-import com.alex.lowcodingplatform.model.dto.app.AppQueryRequest;
-import com.alex.lowcodingplatform.model.dto.app.AppUpdateRequest;
+import com.alex.lowcodingplatform.model.dto.app.*;
 import com.alex.lowcodingplatform.model.entity.App;
 import com.alex.lowcodingplatform.model.entity.User;
 import com.alex.lowcodingplatform.model.vo.app.AppVO;
@@ -25,10 +23,15 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author wsh
@@ -44,6 +47,43 @@ public class AppController {
     @Resource
     private AppService appService;
 
+
+
+    @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                      @RequestParam String userMessage,
+                                      HttpServletRequest request) {
+        // 参数校验
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "APP ID 不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户的消息不能为空");
+        User loginUser = userService.getLoginUser(request);
+
+
+        // 需要对流式输出进行封装，封装一个 {"d": "msg"} 结果的输出
+        Flux<String> stream = appService.chatToGenCode(appId, userMessage, loginUser);
+        return stream.map(chunk -> {
+            // 使用 JSON 进行封装
+            Map<String, String> wrapper = Map.of("d", chunk);
+            String jsonStr = JSONUtil.toJsonStr(wrapper);
+            return ServerSentEvent.<String>builder()
+                    .data(jsonStr)
+                    .build();
+        }).concatWith(
+                // 输出一个结束符，方便告知流式输出结束
+                Mono.just(ServerSentEvent.<String>builder().event("done").data("").build())
+        );
+    }
+
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest deployRequest, HttpServletRequest request) {
+        // 参数校验
+        ThrowUtils.throwIf(deployRequest == null, ErrorCode.PARAMS_ERROR, "部署请求不能为空");
+        Long appId = deployRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "APP ID 不能为空");
+        User loginUser = userService.getLoginUser(request);
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
+    }
 
 
     /**

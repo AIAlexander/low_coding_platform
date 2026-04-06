@@ -21,10 +21,10 @@ public class CodeSaverExecutor {
     private static final MultiHtmlCodeSaver MULTI_HTML_SAVER = new MultiHtmlCodeSaver();
 
 
-    public static File saveCode(Object result, CodeGenerateType type) {
+    public static File saveCode(Object result, CodeGenerateType type, Long appId) {
         return switch (type) {
-            case HTML -> HTML_SAVER.save((HtmlCodeResponse) result);
-            case MULTI_FILE -> MULTI_HTML_SAVER.save((MultiHtmlCodeResponse) result);
+            case HTML -> HTML_SAVER.save((HtmlCodeResponse) result, appId);
+            case MULTI_FILE -> MULTI_HTML_SAVER.save((MultiHtmlCodeResponse) result, appId);
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的类型");
         };
     }

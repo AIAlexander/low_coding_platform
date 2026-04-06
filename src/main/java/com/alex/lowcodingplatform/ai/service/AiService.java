@@ -24,7 +24,7 @@ public interface AiService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/html_system_prompt.txt")
     Flux<String> generateHtmlCodeStream(String userMessage);
 
     /**
@@ -33,7 +33,7 @@ public interface AiService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/multi_html_system_prompt.txt")
     Flux<String> generateMultiFileCodeStream(String userMessage);
 
 }

@@ -21,9 +21,9 @@ public class MultiHtmlCodeSaver extends AbstractSaver<MultiHtmlCodeResponse>{
         // html代码
         writeFile(baseDir, "index.html", result.getHtmlCode());
         // css代码
-        writeFile(baseDir, "index.css", result.getCssCode());
+        writeFile(baseDir, "style.css", result.getCssCode());
         // js代码
-        writeFile(baseDir, "index.js", result.getJsCode());
+        writeFile(baseDir, "script.js", result.getJsCode());
     }
 
     @Override

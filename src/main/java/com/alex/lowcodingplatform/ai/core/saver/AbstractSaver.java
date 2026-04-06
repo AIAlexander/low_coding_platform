@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
+import com.alex.lowcodingplatform.constant.AppConstant;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
 
@@ -16,19 +17,20 @@ import java.nio.charset.StandardCharsets;
  */
 public abstract class AbstractSaver<T> {
 
-    private static final String OUTPUT_DIR_PREFIX = "/tmp/code_output";
+    private static final String OUTPUT_DIR_PREFIX = AppConstant.CODE_OUTPUT_ROOT_DIR;
 
 
     /**
      * 保存文件的模版方法
      * @param result
+     * @param appId
      * @return
      */
-    public final File save(T result) {
+    public final File save(T result, Long appId) {
         // 1. 校验
         validate(result);
         // 2. 创建目录
-        String dirPath = buildDirPath();
+        String dirPath = buildDirPath(appId);
         // 3. 保存文件
         saveFile(result, dirPath);
         // 4. 返回文件
@@ -64,11 +66,13 @@ public abstract class AbstractSaver<T> {
 
 
     /**
-     * 构建唯一路径： /tmp/output/{type}_雪花ID
+     * 构建唯一路径： /tmp/code_output/{type}_{appId}
+     * @param appId
      * @return
      */
-    private String buildDirPath() {
-        String dir = StrUtil.format("{}_{}", this.generateType().getValue(), IdUtil.getSnowflakeNextId());
+    private String buildDirPath(Long appId) {
+        ThrowUtils.throwIf(appId == null, ErrorCode.PARAMS_ERROR, "App ID不能为空");
+        String dir = StrUtil.format("{}_{}", generateType().getValue(), appId);
         String dirPath = OUTPUT_DIR_PREFIX + File.separator + dir;
         // 创建目录
         FileUtil.mkdir(dirPath);

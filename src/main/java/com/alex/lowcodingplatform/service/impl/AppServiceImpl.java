@@ -2,13 +2,18 @@ package com.alex.lowcodingplatform.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alex.lowcodingplatform.ai.facade.GenerateCodeFacade;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
+import com.alex.lowcodingplatform.constant.AppConstant;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
 import com.alex.lowcodingplatform.mapper.AppMapper;
 import com.alex.lowcodingplatform.model.dto.app.AppAddRequest;
+import com.alex.lowcodingplatform.model.dto.app.AppDeployRequest;
 import com.alex.lowcodingplatform.model.dto.app.AppQueryRequest;
 import com.alex.lowcodingplatform.model.entity.App;
 import com.alex.lowcodingplatform.model.entity.User;
@@ -21,7 +26,10 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
+import java.io.File;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +48,74 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private UserService userService;
 
+    @Resource
+    private GenerateCodeFacade generateCodeFacade;
+
+
+    @Override
+    public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
+        // 1. 校验参数
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "App ID 不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+
+        // 2. 查询APP
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App 不存在");
+        // 3. 当前用户只能生成自己的APP
+        ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限生成代码");
+        String typeStr = app.getCodeGenType();
+        CodeGenerateType type = CodeGenerateType.getEnumByValue(typeStr);
+        ThrowUtils.throwIf(type == null, ErrorCode.SYSTEM_ERROR, "代码生成类型不存在");
+        // 4. 调用ai生成代码
+        return generateCodeFacade.generateCodeAndSaveStream(userMessage, type, appId);
+    }
+
+    @Override
+    public String deployApp(Long appId, User loginUser) {
+        // 1. 校验参数
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "App ID 不能为空");
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+
+        // 2. 获取APP信息
+        App app = getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App 不存在");
+        // 用户只能部署自己的应用
+        ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限部署应用");
+
+        // 3. 查看是否有deployKey
+        String deployKey = app.getDeployKey();
+        if (StrUtil.isBlank(deployKey)) {
+            // 没有key就生成一个
+            deployKey = RandomUtil.randomString(6);
+        }
+        // 获取app的信息
+        String codeGenType = app.getCodeGenType();
+        // app的名字
+        String appPath = StrUtil.format("{}_{}", codeGenType, app.getId());
+        String appDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + appPath;
+        // 查看路径下是否有文件
+        File sourceFile = new File(appDirPath);
+        if (!sourceFile.exists() || !sourceFile.isDirectory()) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "App不存在，请先生成App");
+        }
+        // 4. 复制文件到部署目录
+        String deployDir = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+        try {
+            FileUtil.copyContent(sourceFile, new File(deployDir), true);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败");
+        }
+
+        // 5. 部署成功，更新数据库
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setDeployKey(deployKey);
+        updateApp.setDeployedTime(LocalDateTime.now());
+        boolean result = this.updateById(updateApp);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "部署失败");
+
+        return StrUtil.format("{}/{}", AppConstant.CODE_DEPLOY_HOST, deployKey);
+    }
 
     @Override
     public AppVO getAppVO(App app) {

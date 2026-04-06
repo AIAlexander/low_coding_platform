@@ -1,12 +1,14 @@
 package com.alex.lowcodingplatform.service;
 
 import com.alex.lowcodingplatform.model.dto.app.AppAddRequest;
+import com.alex.lowcodingplatform.model.dto.app.AppDeployRequest;
 import com.alex.lowcodingplatform.model.dto.app.AppQueryRequest;
 import com.alex.lowcodingplatform.model.entity.App;
 import com.alex.lowcodingplatform.model.entity.User;
 import com.alex.lowcodingplatform.model.vo.app.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -16,8 +18,11 @@ import java.util.List;
  */
 public interface AppService extends IService<App> {
 
+    Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser);
 
-    public AppVO getAppVO(App app);
+    String deployApp(Long appId, User loginUser);
+
+    AppVO getAppVO(App app);
 
     List<AppVO> getAppVOList(List<App> appList);
 

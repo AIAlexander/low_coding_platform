@@ -29,37 +29,37 @@ public class GenerateCodeFacade {
     private AiService aiService;
 
 
-    public File generateCode(String userMessage, CodeGenerateType type) {
+    public File generateCode(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         return switch (type) {
             case HTML -> {
                 HtmlCodeResponse htmlCodeResponse = aiService.generateHtmlCode(userMessage);
-                yield CodeSaverExecutor.saveCode(htmlCodeResponse, type);
+                yield CodeSaverExecutor.saveCode(htmlCodeResponse, type, appId);
             }
             case MULTI_FILE -> {
                 MultiHtmlCodeResponse response = aiService.generateMultiHtmlCode(userMessage);
-                yield CodeSaverExecutor.saveCode(response, type);
+                yield CodeSaverExecutor.saveCode(response, type, appId);
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的生成类型");
         };
     }
 
-    public Flux<String> generateCodeAndSaveStream(String userMessage, CodeGenerateType type) {
+    public Flux<String> generateCodeAndSaveStream(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         return switch (type) {
             case HTML -> {
                 Flux<String> htmlCodeStream = aiService.generateHtmlCodeStream(userMessage);
-                yield generateCodeStream(htmlCodeStream, type);
+                yield generateCodeStream(htmlCodeStream, type, appId);
             }
             case MULTI_FILE -> {
                 Flux<String> multiFileCodeStream = aiService.generateMultiFileCodeStream(userMessage);
-                yield generateCodeStream(multiFileCodeStream, type);
+                yield generateCodeStream(multiFileCodeStream, type, appId);
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的生成类型");
         };
     }
 
-    private Flux<String> generateCodeStream(Flux<String> codeStream, CodeGenerateType type) {
+    private Flux<String> generateCodeStream(Flux<String> codeStream, CodeGenerateType type, Long appId) {
         // 接受输出流
         StringBuilder stringBuilder = new StringBuilder();
         return codeStream.doOnNext(chunk -> {
@@ -71,7 +71,7 @@ public class GenerateCodeFacade {
                 // 解析
                 Object parserResult = CodeParserExecutor.parser(result, type);
                 // 存入文件
-                File file = CodeSaverExecutor.saveCode(parserResult, type);
+                File file = CodeSaverExecutor.saveCode(parserResult, type, appId);
                 log.info("保存成功，目录:{}", file.getAbsolutePath());
             } catch (Exception e) {
                 log.error("保存失败, {}", e.getMessage());
