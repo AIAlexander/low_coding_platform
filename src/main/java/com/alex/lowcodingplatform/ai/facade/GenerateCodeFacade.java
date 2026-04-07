@@ -2,6 +2,7 @@ package com.alex.lowcodingplatform.ai.facade;
 
 import com.alex.lowcodingplatform.ai.core.parser.executor.CodeParserExecutor;
 import com.alex.lowcodingplatform.ai.core.saver.executor.CodeSaverExecutor;
+import com.alex.lowcodingplatform.ai.factory.AiServiceFactory;
 import com.alex.lowcodingplatform.ai.model.HtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.MultiHtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
@@ -9,6 +10,7 @@ import com.alex.lowcodingplatform.ai.service.AiService;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,12 +27,13 @@ import java.io.File;
 @Slf4j
 public class GenerateCodeFacade {
 
-    @Autowired
-    private AiService aiService;
-
+    @Resource
+    private AiServiceFactory aiServiceFactory;
 
     public File generateCode(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
+        AiService aiService = aiServiceFactory.getAiService(appId);
         return switch (type) {
             case HTML -> {
                 HtmlCodeResponse htmlCodeResponse = aiService.generateHtmlCode(userMessage);
@@ -46,6 +49,8 @@ public class GenerateCodeFacade {
 
     public Flux<String> generateCodeAndSaveStream(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
+        AiService aiService = aiServiceFactory.getAiService(appId);
         return switch (type) {
             case HTML -> {
                 Flux<String> htmlCodeStream = aiService.generateHtmlCodeStream(userMessage);
