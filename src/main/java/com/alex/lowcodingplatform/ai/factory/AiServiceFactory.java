@@ -1,10 +1,15 @@
 package com.alex.lowcodingplatform.ai.factory;
 
+import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import com.alex.lowcodingplatform.ai.service.AiService;
+import com.alex.lowcodingplatform.ai.tool.FileWriteTool;
+import com.alex.lowcodingplatform.exception.BusinessException;
+import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -29,7 +34,7 @@ public class AiServiceFactory {
      * AI服务的本地缓存
      * 因为AI服务绑定App Id，防止频繁创建AI服务，故放入本地缓存
      */
-    private final Cache<Long, AiService> SERVICE_CACHE = Caffeine.newBuilder()
+    private final Cache<String, AiService> SERVICE_CACHE = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofMinutes(30))
             .expireAfterAccess(Duration.ofMinutes(10))
@@ -53,7 +58,7 @@ public class AiServiceFactory {
 
     @Bean
     public AiService aiService() {
-        return createAiServiceWithMemory(0L);
+        return createAiServiceWithMemory(0L, CodeGenerateType.HTML);
     }
 
     /**
@@ -61,9 +66,10 @@ public class AiServiceFactory {
      * @param appId
      * @return
      */
-    public AiService getAiService(Long appId) {
+    public AiService getAiService(Long appId, CodeGenerateType type) {
         // 从本地缓存获取服务实例，不存在再创建
-        return SERVICE_CACHE.get(appId, this::createAiServiceWithMemory);
+        String cacheKey = buildCacheKey(appId, type);
+        return SERVICE_CACHE.get(cacheKey, key -> createAiServiceWithMemory(appId, type));
     }
 
     /**
@@ -71,7 +77,7 @@ public class AiServiceFactory {
      * @param appId
      * @return
      */
-    public AiService createAiServiceWithMemory(Long appId) {
+    public AiService createAiServiceWithMemory(Long appId, CodeGenerateType type) {
         log.debug("AppId: [{}] 创建AI服务实例", appId);
         // 根据AppId创建会话记忆
         MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
@@ -81,10 +87,30 @@ public class AiServiceFactory {
                 .build();
         // 加载会话历史到内存
         chatHistoryService.loadHistoryToMemory(appId, memory, 20);
-        return AiServices.builder(AiService.class)
-                .chatModel(chatModel)
-                .streamingChatModel(streamingChatModel)
-                .chatMemory(memory)
-                .build();
+
+        // 不同类型的使用不同的模型
+        return switch (type) {
+            case VUE_PROJECT ->
+                    AiServices.builder(AiService.class)
+                            .streamingChatModel(streamingChatModel)
+                            .chatMemoryProvider(memoryId -> memory)
+                            .tools(new FileWriteTool())
+                            // 防止工具幻觉问题
+                            .hallucinatedToolNameStrategy(request ->
+                                    ToolExecutionResultMessage.from(request, "Error: there is no tool called " + request.name())
+                            )
+                            .build();
+            case HTML, MULTI_FILE ->
+                    AiServices.builder(AiService.class)
+                            .chatModel(chatModel)
+                            .streamingChatModel(streamingChatModel)
+                            .chatMemory(memory)
+                            .build();
+            default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型: " + type.getValue());
+        };
+    }
+
+    private String buildCacheKey(long appId, CodeGenerateType type) {
+        return appId + "_" + type.getValue();
     }
 }

@@ -33,7 +33,7 @@ public class GenerateCodeFacade {
     public File generateCode(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
-        AiService aiService = aiServiceFactory.getAiService(appId);
+        AiService aiService = aiServiceFactory.getAiService(appId, type);
         return switch (type) {
             case HTML -> {
                 HtmlCodeResponse htmlCodeResponse = aiService.generateHtmlCode(userMessage);
@@ -50,15 +50,19 @@ public class GenerateCodeFacade {
     public Flux<String> generateCodeAndSaveStream(String userMessage, CodeGenerateType type, Long appId) {
         ThrowUtils.throwIf(type == null, ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
-        AiService aiService = aiServiceFactory.getAiService(appId);
+        AiService aiService = aiServiceFactory.getAiService(appId, type);
         return switch (type) {
             case HTML -> {
-                Flux<String> htmlCodeStream = aiService.generateHtmlCodeStream(userMessage);
+                Flux<String> htmlCodeStream = aiService.generateHtmlCodeStream(appId, userMessage);
                 yield generateCodeStream(htmlCodeStream, type, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> multiFileCodeStream = aiService.generateMultiFileCodeStream(userMessage);
+                Flux<String> multiFileCodeStream = aiService.generateMultiFileCodeStream(appId, userMessage);
                 yield generateCodeStream(multiFileCodeStream, type, appId);
+            }
+            case VUE_PROJECT -> {
+                Flux<String> vueProjectCodeStream = aiService.generateVueProjectStream(appId, userMessage);
+                yield generateCodeStream(vueProjectCodeStream, type, appId);
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的生成类型");
         };

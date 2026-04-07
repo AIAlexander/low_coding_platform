@@ -3,6 +3,7 @@ package com.alex.lowcodingplatform.ai.service;
 import com.alex.lowcodingplatform.ai.factory.AiServiceFactory;
 import com.alex.lowcodingplatform.ai.model.HtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.MultiHtmlCodeResponse;
+import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class AiServiceTest {
 
     @Test
     void generateHtmlCode() {
-        AiService aiService = factory.getAiService(0L);
+        AiService aiService = factory.getAiService(0L, CodeGenerateType.HTML);
         HtmlCodeResponse response = aiService.generateHtmlCode("做一个简单的任务记录网站，不超过20行代码");
         Assertions.assertNotNull(response);
 
@@ -41,7 +42,7 @@ class AiServiceTest {
 
     @Test
     void chatTest() {
-        AiService aiService = factory.getAiService(1L);
+        AiService aiService = factory.getAiService(1L, CodeGenerateType.HTML);
         String chat = aiService.chat("你好，我是Alex");
         System.out.println(chat);
         String chat1 = aiService.chat("你好，我是谁?");

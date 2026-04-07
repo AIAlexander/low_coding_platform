@@ -34,7 +34,7 @@ public interface AiService {
      * @return 生成的代码结果
      */
     @SystemMessage(fromResource = "prompt/html_system_prompt.txt")
-    Flux<String> generateHtmlCodeStream(String userMessage);
+    Flux<String> generateHtmlCodeStream(@MemoryId long appId, String userMessage);
 
     /**
      * 生成多文件代码（流式）
@@ -43,6 +43,14 @@ public interface AiService {
      * @return 生成的代码结果
      */
     @SystemMessage(fromResource = "prompt/multi_html_system_prompt.txt")
-    Flux<String> generateMultiFileCodeStream(String userMessage);
+    Flux<String> generateMultiFileCodeStream(@MemoryId long appId, String userMessage);
 
+    /**
+     * 生成Vue项目代码（流式）
+     * @param appId
+     * @param userMessage
+     * @return
+     */
+    @SystemMessage(fromResource = "prompt/vue_project_system_prompt.txt")
+    Flux<String> generateVueProjectStream(@MemoryId long appId, @UserMessage String userMessage);
 }
