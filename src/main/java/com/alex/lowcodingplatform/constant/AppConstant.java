@@ -29,4 +29,6 @@ public interface AppConstant {
 
     String VUE_PROJECT_DIR_PREFIX = CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_";
 
+    String SCREEN_SHOT_ROOT_DIR = System.getProperty("user.dir") + File.separator + "tmp" + File.separator + "screenshot";
+
 }

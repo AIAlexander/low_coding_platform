@@ -24,6 +24,7 @@ import com.alex.lowcodingplatform.model.vo.app.AppVO;
 import com.alex.lowcodingplatform.model.vo.user.UserVO;
 import com.alex.lowcodingplatform.service.AppService;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
+import com.alex.lowcodingplatform.service.ScreenshotService;
 import com.alex.lowcodingplatform.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -65,6 +66,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ScreenshotService screenshotService;
 
 
     @Override
@@ -148,7 +152,26 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean result = this.updateById(updateApp);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "部署失败");
-        return StrUtil.format("{}/{}", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 7. 生成项目的url
+        String deployUrl = StrUtil.format("{}/{}", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 8. 异步生成项目封面
+        generateAppScreenshotAsync(appId, deployUrl);
+        return deployUrl;
+    }
+
+    @Override
+    public void generateAppScreenshotAsync(Long appId, String appUrl) {
+        // 使用虚拟线程异步执行
+        Thread.startVirtualThread(() -> {
+            // 截图并上传
+            String ossUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+            // 更新APP
+            App updateApp = new App();
+            updateApp.setId(appId);
+            updateApp.setCover(ossUrl);
+            boolean result = this.updateById(updateApp);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "更新APP封面失败");
+        });
     }
 
     @Override

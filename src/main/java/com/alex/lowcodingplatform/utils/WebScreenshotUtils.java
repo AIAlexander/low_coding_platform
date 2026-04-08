@@ -4,6 +4,7 @@ import cn.hutool.core.img.ImgUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alex.lowcodingplatform.constant.AppConstant;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import io.github.bonigarcia.wdm.WebDriverManager;
@@ -55,7 +56,7 @@ public class WebScreenshotUtils {
             return null;
         }
         // 设置路径
-        String rootPath = System.getProperty("user.dir") + File.separator + "tmp" + File.separator + "screenshot" + File.separator + UUID.randomUUID().toString().substring(0, 8);
+        String rootPath = AppConstant.SCREEN_SHOT_ROOT_DIR + File.separator + UUID.randomUUID().toString().substring(0, 8);
         FileUtil.mkdir(rootPath);
         // 图片后缀
         final String IMAGE_SUFFIX = ".png";
