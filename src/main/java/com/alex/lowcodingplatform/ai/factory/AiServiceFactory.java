@@ -83,7 +83,7 @@ public class AiServiceFactory {
         MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
+                .maxMessages(50)
                 .build();
         // 加载会话历史到内存
         chatHistoryService.loadHistoryToMemory(appId, memory, 20);

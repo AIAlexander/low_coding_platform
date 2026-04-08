@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alex.lowcodingplatform.ai.core.handler.StreamHandlerExecutor;
 import com.alex.lowcodingplatform.ai.facade.GenerateCodeFacade;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import com.alex.lowcodingplatform.constant.AppConstant;
@@ -17,6 +18,7 @@ import com.alex.lowcodingplatform.model.dto.app.AppDeployRequest;
 import com.alex.lowcodingplatform.model.dto.app.AppQueryRequest;
 import com.alex.lowcodingplatform.model.entity.App;
 import com.alex.lowcodingplatform.model.entity.User;
+import com.alex.lowcodingplatform.model.enums.ChatHistoryMessageTypeEnum;
 import com.alex.lowcodingplatform.model.vo.app.AppVO;
 import com.alex.lowcodingplatform.model.vo.user.UserVO;
 import com.alex.lowcodingplatform.service.AppService;
@@ -57,23 +59,33 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ChatHistoryService chatHistoryService;
 
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
         // 1. 校验参数
         ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "App ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
-
         // 2. 查询APP
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App 不存在");
         // 3. 当前用户只能生成自己的APP
         ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限生成代码");
         String typeStr = app.getCodeGenType();
-        CodeGenerateType type = CodeGenerateType.getEnumByValue(typeStr);
+        CodeGenerateType type = CodeGenerateType.VUE_PROJECT;
         ThrowUtils.throwIf(type == null, ErrorCode.SYSTEM_ERROR, "代码生成类型不存在");
-        // 4. 调用ai生成代码
-        return generateCodeFacade.generateCodeAndSaveStream(userMessage, type, appId);
+        // 4. 添加对话历史记录
+        chatHistoryService.addChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        // 5. 调用ai生成代码
+        Flux<String> stream = generateCodeFacade.generateCodeAndSaveStream(userMessage, type, appId);
+        /**
+         * 6. 下游需要根据上游返回的Stream，做特殊处理
+         * VUE_PROJECT模式下，一个chunk是一个Json对象
+         * 其他模式下，一个chunk是一个文本块
+         */
+        return streamHandlerExecutor.doExecute(stream, chatHistoryService, appId, loginUser, type);
     }
 
     @Override

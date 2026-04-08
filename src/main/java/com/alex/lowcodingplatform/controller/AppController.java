@@ -63,36 +63,19 @@ public class AppController {
         ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户的消息不能为空");
         User loginUser = userService.getLoginUser(request);
 
-        // 记录到chat_history中
-        chatHistoryService.addChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-
         // 需要对流式输出进行封装，封装一个 {"d": "msg"} 结果的输出
         Flux<String> stream = appService.chatToGenCode(appId, userMessage, loginUser);
-
-        // 记录ai_message
-        StringBuilder aiResponse = new StringBuilder();
         return stream.map(chunk -> {
-            aiResponse.append(chunk);
             // 使用 JSON 进行封装
             Map<String, String> wrapper = Map.of("d", chunk);
             String jsonStr = JSONUtil.toJsonStr(wrapper);
             return ServerSentEvent.<String>builder()
                     .data(jsonStr)
                     .build();
-        }).doOnComplete(() -> {
-            // 流式输出的结束
-            String responseStr = aiResponse.toString();
-            if (!StrUtil.isBlank(responseStr)) {
-                chatHistoryService.addChatMessage(appId, responseStr, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-            }
         }).concatWith(
                 // 输出一个结束符，方便告知流式输出结束
                 Mono.just(ServerSentEvent.<String>builder().event("done").data("").build())
-        ).doOnError(error -> {
-            log.error("AI回复失败", error);
-            String errorMsg = "AI回复失败：" + error.getMessage();
-            chatHistoryService.addChatMessage(appId, errorMsg, ChatHistoryMessageTypeEnum.AI.getText(), loginUser.getId());
-        });
+        );
     }
 
     @PostMapping("/deploy")

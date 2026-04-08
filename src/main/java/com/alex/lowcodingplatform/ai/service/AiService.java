@@ -4,6 +4,7 @@ import com.alex.lowcodingplatform.ai.model.HtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.MultiHtmlCodeResponse;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import reactor.core.publisher.Flux;
 
@@ -49,8 +50,8 @@ public interface AiService {
      * 生成Vue项目代码（流式）
      * @param appId
      * @param userMessage
-     * @return
+     * @return 使用TokenStream进行返回
      */
     @SystemMessage(fromResource = "prompt/vue_project_system_prompt.txt")
-    Flux<String> generateVueProjectStream(@MemoryId long appId, @UserMessage String userMessage);
+    TokenStream generateVueProjectStream(@MemoryId long appId, @UserMessage String userMessage);
 }

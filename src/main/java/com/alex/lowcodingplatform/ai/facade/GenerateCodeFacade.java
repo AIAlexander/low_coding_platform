@@ -1,15 +1,22 @@
 package com.alex.lowcodingplatform.ai.facade;
 
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import com.alex.lowcodingplatform.ai.core.parser.executor.CodeParserExecutor;
 import com.alex.lowcodingplatform.ai.core.saver.executor.CodeSaverExecutor;
 import com.alex.lowcodingplatform.ai.factory.AiServiceFactory;
 import com.alex.lowcodingplatform.ai.model.HtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.MultiHtmlCodeResponse;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
+import com.alex.lowcodingplatform.ai.model.message.AiResponseMessage;
+import com.alex.lowcodingplatform.ai.model.message.ToolExecutedMessage;
+import com.alex.lowcodingplatform.ai.model.message.ToolRequestMessage;
 import com.alex.lowcodingplatform.ai.service.AiService;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.service.TokenStream;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,8 +68,8 @@ public class GenerateCodeFacade {
                 yield generateCodeStream(multiFileCodeStream, type, appId);
             }
             case VUE_PROJECT -> {
-                Flux<String> vueProjectCodeStream = aiService.generateVueProjectStream(appId, userMessage);
-                yield generateCodeStream(vueProjectCodeStream, type, appId);
+                TokenStream vueProjectCodeStream = aiService.generateVueProjectStream(appId, userMessage);
+                yield processTokenStream(vueProjectCodeStream);
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的生成类型");
         };
@@ -87,5 +94,37 @@ public class GenerateCodeFacade {
             }
         });
 
+    }
+
+    /**
+     * VUE_PROJECT使用TokenStream，整个方法返回的是Flux
+     * 因此开发一个适配器，适配Flux
+     * @return
+     */
+    private Flux<String> processTokenStream(TokenStream tokenStream) {
+        return Flux.create(sink -> {
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                // 普通的AI响应，封装成一个AiResponseMessage对象，方便解析
+                AiResponseMessage aiMsg = new AiResponseMessage(partialResponse);
+                sink.next(JSONUtil.toJsonStr(aiMsg));
+            }
+            ).onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                // AI调用工具请求的参数，封装成一个ToolRequestMessage
+                ToolRequestMessage toolRequestMsg = new ToolRequestMessage(toolExecutionRequest);
+                sink.next(JSONUtil.toJsonStr(toolRequestMsg));
+            }
+            ).onToolExecuted((toolExecution) -> {
+                // AI调用工具完成的参数，封装成一个ToolExecutedMessage
+                ToolExecutedMessage toolExecutedMsg = new ToolExecutedMessage(toolExecution);
+                sink.next(JSONUtil.toJsonStr(toolExecutedMsg));
+            }).onCompleteResponse((ChatResponse response) -> {
+                // AI 响应完成
+                sink.complete();
+            }).onError((Throwable error) -> {
+                // 处理错误
+                error.printStackTrace();
+                sink.error(error);
+            }).start();
+        });
     }
 }
