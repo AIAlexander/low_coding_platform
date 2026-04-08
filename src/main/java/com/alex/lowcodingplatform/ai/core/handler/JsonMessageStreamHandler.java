@@ -4,10 +4,13 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.alex.lowcodingplatform.ai.core.builder.VueProjectBuilder;
 import com.alex.lowcodingplatform.ai.model.message.*;
+import com.alex.lowcodingplatform.constant.AppConstant;
 import com.alex.lowcodingplatform.model.entity.User;
 import com.alex.lowcodingplatform.model.enums.ChatHistoryMessageTypeEnum;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -22,6 +25,9 @@ import java.util.Set;
 @Slf4j
 @Component
 public class JsonMessageStreamHandler {
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 处理 TokenStream（VUE_PROJECT）
@@ -50,6 +56,9 @@ public class JsonMessageStreamHandler {
                     // 流式响应完成后，添加 AI 消息到对话历史
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    // 返回完成，异步构建vue项目
+                    String path = AppConstant.VUE_PROJECT_DIR_PREFIX + appId;
+                    vueProjectBuilder.buildProjectAsync(path);
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息

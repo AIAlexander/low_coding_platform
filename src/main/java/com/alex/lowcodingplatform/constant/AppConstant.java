@@ -1,5 +1,7 @@
 package com.alex.lowcodingplatform.constant;
 
+import java.io.File;
+
 /**
  * @author wsh
  * @date 2026/4/6
@@ -24,5 +26,7 @@ public interface AppConstant {
      * 应用部署域名
      */
     String CODE_DEPLOY_HOST = "http://localhost";
+
+    String VUE_PROJECT_DIR_PREFIX = CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_";
 
 }

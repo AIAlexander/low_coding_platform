@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alex.lowcodingplatform.ai.core.builder.VueProjectBuilder;
 import com.alex.lowcodingplatform.ai.core.handler.StreamHandlerExecutor;
 import com.alex.lowcodingplatform.ai.facade.GenerateCodeFacade;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
@@ -62,6 +63,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private StreamHandlerExecutor streamHandlerExecutor;
 
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
+
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
@@ -74,7 +78,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 3. 当前用户只能生成自己的APP
         ThrowUtils.throwIf(!app.getUserId().equals(loginUser.getId()), ErrorCode.NO_AUTH_ERROR, "无权限生成代码");
         String typeStr = app.getCodeGenType();
-        CodeGenerateType type = CodeGenerateType.VUE_PROJECT;
+        CodeGenerateType type = CodeGenerateType.getEnumByValue(typeStr);
         ThrowUtils.throwIf(type == null, ErrorCode.SYSTEM_ERROR, "代码生成类型不存在");
         // 4. 添加对话历史记录
         chatHistoryService.addChatMessage(appId, userMessage, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
@@ -116,22 +120,34 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (!sourceFile.exists() || !sourceFile.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "App不存在，请先生成App");
         }
-        // 4. 复制文件到部署目录
+
+        // 4. Vue项目特殊处理，部署时使用最新的代码进行构建
+        if (StrUtil.equals(CodeGenerateType.VUE_PROJECT.getValue(), codeGenType)) {
+            // Vue项目构建，直接打包
+            boolean buildResult = vueProjectBuilder.buildProject(appDirPath);
+            ThrowUtils.throwIf(!buildResult, ErrorCode.SYSTEM_ERROR, "Vue项目构建失败");
+            // 检查dist文件是否存在
+            File distDir = new File(appDirPath + File.separator + "dist");
+            ThrowUtils.throwIf(!distDir.exists() || !distDir.isDirectory(),
+                    ErrorCode.SYSTEM_ERROR, "Vue项目构建失败，dist目录不存在");
+            // 只需要拷贝dist文件到 output_deploy下即可
+            sourceFile = distDir;
+            log.info("Vue项目构建成功，部署dist目录：{}", distDir.getAbsolutePath());
+        }
+        // 5. 复制文件到部署目录
         String deployDir = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
         try {
             FileUtil.copyContent(sourceFile, new File(deployDir), true);
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败");
         }
-
-        // 5. 部署成功，更新数据库
+        // 6. 部署成功，更新数据库
         App updateApp = new App();
         updateApp.setId(appId);
         updateApp.setDeployKey(deployKey);
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean result = this.updateById(updateApp);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "部署失败");
-
         return StrUtil.format("{}/{}", AppConstant.CODE_DEPLOY_HOST, deployKey);
     }
 
