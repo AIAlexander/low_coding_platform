@@ -1,0 +1,91 @@
+package com.alex.lowcodingplatform.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.ZipUtil;
+import com.alex.lowcodingplatform.exception.ErrorCode;
+import com.alex.lowcodingplatform.exception.ThrowUtils;
+import com.alex.lowcodingplatform.service.ProjectDownloadService;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.util.Set;
+
+/**
+ * @author wangshuhao
+ * @date 2026/4/8
+ */
+@Service
+@Slf4j
+public class ProjectDownloadServiceImpl implements ProjectDownloadService {
+
+    /**
+     * 需要过滤的文件和目录名称
+     */
+    private static final Set<String> IGNORED_NAMES = Set.of(
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".DS_Store",
+            ".env",
+            "target",
+            ".mvn",
+            ".idea",
+            ".vscode"
+    );
+
+    /**
+     * 需要过滤的文件扩展名
+     */
+    private static final Set<String> IGNORED_EXTENSIONS = Set.of(
+            ".log",
+            ".tmp",
+            ".cache"
+    );
+
+
+    @Override
+    public String downloadAsZip(String projectPath, String downloadName, HttpServletResponse response) {
+        // 1. 参数校验
+        ThrowUtils.throwIf(StrUtil.isBlank(projectPath), ErrorCode.PARAMS_ERROR, "项目路径不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(downloadName), ErrorCode.PARAMS_ERROR, "下载包名称不能为空");
+        // 2. 进行文件过滤
+        File projectDir = new File(projectPath);
+        ThrowUtils.throwIf(!projectDir.exists(), ErrorCode.NOT_FOUND_ERROR, "项目路径不存在");
+        ThrowUtils.throwIf(!projectDir.isDirectory(), ErrorCode.PARAMS_ERROR, "指定的路径不是目录");
+        log.info("开始下载项目：{} -> {}.zip", projectPath, downloadName);
+        // 3. 打zip包
+
+        // 4. 返回zip包名称
+
+        return null;
+    }
+
+    /**
+     * 检查路径是否允许包含在压缩包中
+     *
+     * @param projectRoot 项目根目录
+     * @param fullPath    完整路径
+     * @return 是否允许
+     */
+    private boolean isPathAllowed(Path projectRoot, Path fullPath) {
+        // 获取相对路径
+        Path relativePath = projectRoot.relativize(fullPath);
+        // 检查路径中的每一部分
+        for (Path part : relativePath) {
+            String partName = part.toString();
+            // 检查是否在忽略名称列表中
+            if (IGNORED_NAMES.contains(partName)) {
+                return false;
+            }
+            // 检查文件扩展名
+            if (IGNORED_EXTENSIONS.stream().anyMatch(partName::endsWith)) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
