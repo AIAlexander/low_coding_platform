@@ -25,6 +25,7 @@ import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -243,6 +244,11 @@ public class AppController {
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
         // 获取封装类（包含用户信息）
         return ResultUtils.success(appService.getAppVO(app));
+    }
+
+    @GetMapping("/download/{appId}")
+    public void downloadAppCode(@PathVariable Long appId, HttpServletRequest request, HttpServletResponse response) {
+
     }
 
     /**

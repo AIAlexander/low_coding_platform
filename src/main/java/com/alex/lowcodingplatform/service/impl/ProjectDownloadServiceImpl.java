@@ -2,6 +2,7 @@ package com.alex.lowcodingplatform.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.ZipUtil;
+import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.exception.ThrowUtils;
 import com.alex.lowcodingplatform.service.ProjectDownloadService;
@@ -10,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.FileFilter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Set;
 
@@ -52,16 +55,21 @@ public class ProjectDownloadServiceImpl implements ProjectDownloadService {
         // 1. 参数校验
         ThrowUtils.throwIf(StrUtil.isBlank(projectPath), ErrorCode.PARAMS_ERROR, "项目路径不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(downloadName), ErrorCode.PARAMS_ERROR, "下载包名称不能为空");
-        // 2. 进行文件过滤
         File projectDir = new File(projectPath);
         ThrowUtils.throwIf(!projectDir.exists(), ErrorCode.NOT_FOUND_ERROR, "项目路径不存在");
         ThrowUtils.throwIf(!projectDir.isDirectory(), ErrorCode.PARAMS_ERROR, "指定的路径不是目录");
         log.info("开始下载项目：{} -> {}.zip", projectPath, downloadName);
+        // 2. 进行文件过滤
+        FileFilter filter = file -> isPathAllowed(projectDir.toPath(), file.toPath());
         // 3. 打zip包
-
-        // 4. 返回zip包名称
-
-        return null;
+        try {
+            ZipUtil.zip(response.getOutputStream(), StandardCharsets.UTF_8, false, filter, projectDir);
+            log.info("项目打包下载完成:{}", downloadName);
+            return downloadName;
+        } catch (Exception e) {
+            log.error("项目打包异常");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "项目打包下载失败");
+        }
     }
 
     /**
