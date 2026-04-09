@@ -57,15 +57,15 @@ public class AppController {
 
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
-                                      @RequestParam String userMessage,
+                                      @RequestParam String message,
                                       HttpServletRequest request) {
         // 参数校验
         ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "APP ID 不能为空");
-        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户的消息不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户的消息不能为空");
         User loginUser = userService.getLoginUser(request);
 
         // 需要对流式输出进行封装，封装一个 {"d": "msg"} 结果的输出
-        Flux<String> stream = appService.chatToGenCode(appId, userMessage, loginUser);
+        Flux<String> stream = appService.chatToGenCode(appId, message, loginUser);
         return stream.map(chunk -> {
             // 使用 JSON 进行封装
             Map<String, String> wrapper = Map.of("d", chunk);
