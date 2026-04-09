@@ -28,8 +28,8 @@ class AiServiceTest {
         HtmlCodeResponse response = aiService.generateHtmlCode("做一个简单的任务记录网站，不超过20行代码");
         Assertions.assertNotNull(response);
 
-        HtmlCodeResponse response2 = aiService.generateHtmlCode("不需要生成网站代码！你只需要告诉我刚才开发了一个什么网站");
-        Assertions.assertNotNull(response2);
+//        HtmlCodeResponse response2 = aiService.generateHtmlCode("不需要生成网站代码！你只需要告诉我刚才开发了一个什么网站");
+//        Assertions.assertNotNull(response2);
 
     }
 

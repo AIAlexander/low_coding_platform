@@ -16,6 +16,7 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -45,6 +46,7 @@ public class AiServiceFactory {
             .build();
 
     @Autowired
+    @Qualifier("openAiChatModel")
     private ChatModel chatModel;
 
     @Autowired
@@ -104,7 +106,7 @@ public class AiServiceFactory {
                     AiServices.builder(AiService.class)
                             .chatModel(chatModel)
                             .streamingChatModel(streamingChatModel)
-                            .chatMemory(memory)
+                            .chatMemoryProvider(memoryId -> memory)
                             .build();
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型: " + type.getValue());
         };

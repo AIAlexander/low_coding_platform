@@ -9,6 +9,8 @@ import com.alex.lowcodingplatform.ai.core.builder.VueProjectBuilder;
 import com.alex.lowcodingplatform.ai.core.handler.StreamHandlerExecutor;
 import com.alex.lowcodingplatform.ai.facade.GenerateCodeFacade;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
+import com.alex.lowcodingplatform.ai.service.AiRoutingService;
+import com.alex.lowcodingplatform.common.ResultUtils;
 import com.alex.lowcodingplatform.constant.AppConstant;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
@@ -70,6 +72,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ScreenshotService screenshotService;
 
+    @Resource
+    private AiRoutingService aiRoutingService;
+
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userMessage, User loginUser) {
@@ -94,6 +99,37 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
          * 其他模式下，一个chunk是一个文本块
          */
         return streamHandlerExecutor.doExecute(stream, chatHistoryService, appId, loginUser, type);
+    }
+
+    @Override
+    public Long addApp(AppAddRequest appAddRequest, User loginUser) {
+        ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR);
+        // 1. 参数校验
+        String initPrompt = appAddRequest.getInitPrompt();
+        ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
+        ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        // 2. 调用AI智能路由
+        // 默认html生成
+        CodeGenerateType type = CodeGenerateType.HTML;
+        try {
+            type = aiRoutingService.route(initPrompt);
+            log.info("AI智能路由结果：{}", type);
+        } catch (Exception e) {
+            // 大模型出错使用默认HTML
+            log.error("AI智能路由出错，使用默认HTML生成! 信息：{}", e.getMessage(), e);
+        }
+        // 3. 构造入库对象
+        App app = new App();
+        BeanUtil.copyProperties(appAddRequest, app);
+        app.setUserId(loginUser.getId());
+        // 应用名称暂时为 initPrompt 前 12 位
+        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        // 暂时设置为多文件生成
+        app.setCodeGenType(type.getValue());
+        // 插入数据库
+        boolean result = this.save(app);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return app.getId();
     }
 
     @Override
