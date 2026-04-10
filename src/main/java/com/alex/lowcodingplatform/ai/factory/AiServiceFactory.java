@@ -3,6 +3,7 @@ package com.alex.lowcodingplatform.ai.factory;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import com.alex.lowcodingplatform.ai.service.AiService;
 import com.alex.lowcodingplatform.ai.tool.FileWriteTool;
+import com.alex.lowcodingplatform.ai.tool.ToolManager;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
@@ -58,6 +59,9 @@ public class AiServiceFactory {
     @Autowired
     private ChatHistoryService chatHistoryService;
 
+    @Autowired
+    private ToolManager toolManager;
+
     @Bean
     public AiService aiService() {
         return createAiServiceWithMemory(0L, CodeGenerateType.HTML);
@@ -96,7 +100,7 @@ public class AiServiceFactory {
                     AiServices.builder(AiService.class)
                             .streamingChatModel(streamingChatModel)
                             .chatMemoryProvider(memoryId -> memory)
-                            .tools(new FileWriteTool())
+                            .tools(toolManager.getToolList())
                             // 防止工具幻觉问题
                             .hallucinatedToolNameStrategy(request ->
                                     ToolExecutionResultMessage.from(request, "Error: there is no tool called " + request.name())
