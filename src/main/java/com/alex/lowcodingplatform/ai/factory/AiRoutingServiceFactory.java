@@ -1,6 +1,7 @@
 package com.alex.lowcodingplatform.ai.factory;
 
 import com.alex.lowcodingplatform.ai.service.AiRoutingService;
+import com.alex.lowcodingplatform.utils.SpringContextUtil;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
@@ -18,18 +19,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiRoutingServiceFactory {
 
-    /**
-     * 注入路由专用的 ChatModel
-     * 使用 @Qualifier 指定 Bean 名称
-     */
-    @Resource
-    @Qualifier("routingChatModel")
-    private ChatModel routingChatModel;
-
-    @Bean
-    public AiRoutingService aiRoutingService() {
+    public AiRoutingService createRoutingService() {
+        // 从容器中获取多例的模型
+        ChatModel routingChatModel = SpringContextUtil.getBean("routingChatModel", ChatModel.class);
         return AiServices.builder(AiRoutingService.class)
                 .chatModel(routingChatModel)
                 .build();
+    }
+
+    @Bean
+    public AiRoutingService aiRoutingService() {
+        return createRoutingService();
     }
 }

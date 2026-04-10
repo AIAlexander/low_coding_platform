@@ -7,6 +7,7 @@ import com.alex.lowcodingplatform.ai.tool.ToolManager;
 import com.alex.lowcodingplatform.exception.BusinessException;
 import com.alex.lowcodingplatform.exception.ErrorCode;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
+import com.alex.lowcodingplatform.utils.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
@@ -46,12 +47,6 @@ public class AiServiceFactory {
             })
             .build();
 
-    @Autowired
-    @Qualifier("openAiChatModel")
-    private ChatModel chatModel;
-
-    @Autowired
-    private StreamingChatModel streamingChatModel;
 
     @Autowired
     private RedisChatMemoryStore redisChatMemoryStore;
@@ -96,22 +91,34 @@ public class AiServiceFactory {
 
         // 不同类型的使用不同的模型
         return switch (type) {
-            case VUE_PROJECT ->
-                    AiServices.builder(AiService.class)
-                            .streamingChatModel(streamingChatModel)
-                            .chatMemoryProvider(memoryId -> memory)
-                            .tools(toolManager.getToolList())
-                            // 防止工具幻觉问题
-                            .hallucinatedToolNameStrategy(request ->
-                                    ToolExecutionResultMessage.from(request, "Error: there is no tool called " + request.name())
-                            )
-                            .build();
-            case HTML, MULTI_FILE ->
-                    AiServices.builder(AiService.class)
-                            .chatModel(chatModel)
-                            .streamingChatModel(streamingChatModel)
-                            .chatMemoryProvider(memoryId -> memory)
-                            .build();
+            case VUE_PROJECT -> {
+                // 获取一个复杂任务推理模型
+                StreamingChatModel reasoningStreamingChatModel =
+                        SpringContextUtil.getBean("reasoningStreamingChatModelPrototype", StreamingChatModel.class);
+                yield AiServices.builder(AiService.class)
+                        .streamingChatModel(reasoningStreamingChatModel)
+                        .chatMemoryProvider(memoryId -> memory)
+                        .tools(toolManager.getToolList())
+                        // 防止工具幻觉问题
+                        .hallucinatedToolNameStrategy(request ->
+                                ToolExecutionResultMessage.from(request, "Error: there is no tool called " + request.name())
+                        )
+                        .build();
+            }
+
+            case HTML, MULTI_FILE -> {
+                // 获取一个简单的模型
+                ChatModel chatModel =
+                        SpringContextUtil.getBean("simpleChatModelPrototype", ChatModel.class);
+                StreamingChatModel streamingChatModel =
+                        SpringContextUtil.getBean("simpleStreamingChatModelPrototype", StreamingChatModel.class);
+                yield AiServices.builder(AiService.class)
+                        .chatModel(chatModel)
+                        .streamingChatModel(streamingChatModel)
+                        .chatMemoryProvider(memoryId -> memory)
+                        .build();
+            }
+
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型: " + type.getValue());
         };
     }

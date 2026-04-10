@@ -1,7 +1,7 @@
 package com.alex.lowcodingplatform.ai.config;
 
-import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -9,16 +9,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
 /**
- * 路由模型配置
- * 
  * @author wangshuhao
- * @date 2026/4/9
+ * @date 2026/4/10
  */
+
 @Configuration
-@ConfigurationProperties(prefix = "langchain4j.open-ai.routing-chat-model")
+@ConfigurationProperties(prefix = "langchain4j.open-ai.reasonging-streaming-model")
 @Data
-public class RoutingModelConfig {
-    
+public class ReasoningStreamModelConfig {
+
     private String baseUrl;
     private String apiKey;
     private String modelName;
@@ -28,23 +27,17 @@ public class RoutingModelConfig {
     private Boolean logRequests;
     private Boolean logResponses;
 
-    
-    /**
-     * 创建路由专用的 ChatModel Bean
-     * 使用 @Qualifier("routingChatModel") 进行区分
-     */
-    @Bean("routingChatModel")
+    @Bean
     @Scope("prototype")
-    public ChatModel routingChatModel() {
-        OpenAiChatModel.OpenAiChatModelBuilder builder = OpenAiChatModel.builder()
-                .baseUrl(baseUrl)
+    public StreamingChatModel reasoningStreamingChatModelPrototype() {
+        return OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
+                .baseUrl(baseUrl)
                 .modelName(modelName)
-                .temperature(temperature)
                 .maxTokens(maxTokens)
-                .maxRetries(maxRetries)
+                .temperature(temperature)
                 .logRequests(logRequests)
-                .logResponses(logResponses);
-        return builder.build();
+                .logResponses(logResponses)
+                .build();
     }
 }

@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.alex.lowcodingplatform.ai.core.builder.VueProjectBuilder;
 import com.alex.lowcodingplatform.ai.core.handler.StreamHandlerExecutor;
 import com.alex.lowcodingplatform.ai.facade.GenerateCodeFacade;
+import com.alex.lowcodingplatform.ai.factory.AiRoutingServiceFactory;
 import com.alex.lowcodingplatform.ai.model.enums.CodeGenerateType;
 import com.alex.lowcodingplatform.ai.service.AiRoutingService;
 import com.alex.lowcodingplatform.common.ResultUtils;
@@ -73,7 +74,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ScreenshotService screenshotService;
 
     @Resource
-    private AiRoutingService aiRoutingService;
+    private AiRoutingServiceFactory aiRoutingServiceFactory;
 
 
     @Override
@@ -109,6 +110,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
         // 2. 调用AI智能路由
+        // 2.1 获取智能路由服务
+        AiRoutingService aiRoutingService = aiRoutingServiceFactory.createRoutingService();
         // 默认html生成
         CodeGenerateType type = CodeGenerateType.HTML;
         try {
