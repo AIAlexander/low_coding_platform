@@ -1,7 +1,9 @@
 package com.alex.lowcodingplatform.ai.core.builder;
 
 import cn.hutool.core.util.RuntimeUtil;
+import com.alex.lowcodingplatform.service.BuildSseService;
 import dev.langchain4j.agent.tool.P;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -23,15 +25,29 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class VueProjectBuilder {
 
+    @Resource
+    private BuildSseService buildSseService;
 
-    public void buildProjectAsync(String path) {
+
+    public void buildProjectAsync(String path, Long appId) {
         // 使用虚拟线程
         Thread.ofVirtual().name("vue-builder-" + System.currentTimeMillis()).start(() -> {
             try {
-                buildProject(path);
+                // 发送SSE：building
+                buildSseService.publishBuilding(appId);
+                boolean isSuccess = buildProject(path);
+                if (isSuccess) {
+                    // 成功构建，发送SSE：success
+                    buildSseService.publishSuccess(appId, path);
+                } else {
+                    // 构建失败，发送SSE：fail
+                    buildSseService.publishFail(appId, path, "构建失败");
+                }
             } catch (Exception e) {
                 // 异常在线程里面处理
                 log.error("异步构建vue项目失败，异常：{}", e.getMessage(), e);
+                // 构建失败，发送SSE：fail
+                buildSseService.publishFail(appId, path, "构建失败");
             }
         });
     }

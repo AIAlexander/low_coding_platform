@@ -18,7 +18,10 @@ import com.alex.lowcodingplatform.model.entity.App;
 import com.alex.lowcodingplatform.model.entity.User;
 import com.alex.lowcodingplatform.model.enums.ChatHistoryMessageTypeEnum;
 import com.alex.lowcodingplatform.model.vo.app.AppVO;
+import com.alex.lowcodingplatform.ratelimit.RateLimitType;
+import com.alex.lowcodingplatform.ratelimit.annotation.RateLimit;
 import com.alex.lowcodingplatform.service.AppService;
+import com.alex.lowcodingplatform.service.BuildSseService;
 import com.alex.lowcodingplatform.service.ChatHistoryService;
 import com.alex.lowcodingplatform.service.UserService;
 import com.mybatisflex.core.paginate.Page;
@@ -53,9 +56,10 @@ public class AppController {
     private AppService appService;
 
     @Resource
-    private ChatHistoryService chatHistoryService;
+    private BuildSseService buildSseService;
 
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "AI对话请求过于频繁，请稍后重试")
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                       @RequestParam String message,
                                       HttpServletRequest request) {
@@ -88,6 +92,19 @@ public class AppController {
         User loginUser = userService.getLoginUser(request);
         String deployUrl = appService.deployApp(appId, loginUser);
         return ResultUtils.success(deployUrl);
+    }
+
+    @GetMapping(value = "/vue/build/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> vueBuildStream(@RequestParam Long appId, HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "APP ID 不能为空");
+        User loginUser = userService.getLoginUser(request);
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App 不存在");
+        boolean isCreator = app.getUserId().equals(loginUser.getId());
+        ThrowUtils.throwIf(!isCreator, ErrorCode.NO_AUTH_ERROR, "无权订阅构建状态");
+
+        return buildSseService.subscribe(appId)
+                .map(json -> ServerSentEvent.<String>builder().event("vue-build").data(json).build());
     }
 
 
